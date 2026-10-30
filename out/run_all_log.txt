@@ -1,0 +1,88 @@
+
+=== Tests ===
+$ node tests.mjs
+OK   E2 -- lineDDA (2,1)->(9,5) gives the 8-pixel staircase
+OK   E3 -- lineBresenham (2,1)->(9,5) matches DDA, integers only
+OK   lines -- all 8 octants: the reflected segment has the same length
+OK   E4 -- edge-function signs for A(1,1) B(6,2) C(3,7)
+OK   E5 -- barycentric interpolation 10/20/40 at (.5,.25,.25) = 20
+OK   top-left rule -- 6x6 square split on y=x: every pixel covered once
+OK   no top-left rule -- same square shows the seam (>=0: doubles; >0: gaps)
+OK   E1 -- sample-centre: a 2x2 rect at (1,1) lights exactly (1,1),(2,1),(1,2),(2,2)
+OK   plan -- worldToScreen flips y once and is invertible on a known point
+OK   reference raster -- draw_square fill is byte-identical to ref/square_fill_ref.ppm
+OK   octant -- 24-spoke asterisk: every spoke starts/ends right, 8-connected, <=0.71 px from ideal
+OK   winding -- a reversed (clockwise) triangle still fills the same pixels (autoFlip)
+OK   reference raster -- module triangle A(1,1) B(6,2) C(3,7) is byte-identical to ref/tri_ref.ppm
+
+ALL CHECKS PASSED  (13 ok, 0 fail)
+
+=== Lab 1: generate myplan.json ===
+$ node gen_myplan.mjs
+myplan.json: 83 polylines
+
+=== Lab 2: DDA vs Bresenham ===
+$ node lab2_lines.mjs
+random lines: 20000 (coords 0..199, seed 12345)
+identical pixel lists : 20000 (100.00 %)
+same length, some different pixels: 0 (0.00 %)
+different length      : 0
+timing 20000 x line (0,0)->(399,123): DDA 162.8 ms, Bresenham 78.1 ms
+
+=== Lab 2: triangle gap bug ===
+$ node triangle_gap_bug.mjs
+== evidence: two triangles tiling a 6x6 quad along y = x ==
+naive >=0 (no rule)        once=30  twice=6  gaps=0
+strict >0 (no rule)        once=30  twice=0  gaps=6
+top-left rule              once=36  twice=0  gaps=0
+
+root cause : pixels whose centre lies exactly on the shared edge
+             have an edge function == 0 in BOTH triangles.
+the fix    : per-edge top-left bias -- 0 for a top/left edge,
+             -1 otherwise -- so each on-edge pixel is claimed once.
+proof      : top-left rule -> twice=0, gaps=0
+wrote out/gap_coverage_buggy.ppm (red = double), out/gap_fixed.ppm
+
+=== Lab 2: square (fill) ===
+$ node draw_square.mjs --mode fill
+2 triangles, edge functions + top-left rule
+coverage: 36 pixels, once = 36, twice = 0, gaps = 0
+wrote out/square_fill.ppm
+
+=== Lab 2: raster my plan ===
+$ node draw_plan.mjs --plan myplan.json --fill
+plan "Candi Borobudur -- simplified schematic floor plan (approximate dimensions, not traced from a photo)"
+polylines: 83   segments: 374   framebuffer: 800x600   silhouette FILLED
+wrote out/plan_scratch.ppm (1440015 bytes)
+
+=== Lab 3: benchmark ===
+$ node bench.mjs
+plan segments: 374   framebuffer 800x600   iters 20
+zoom    forward (ms)    backward (ms)   ratio (bwd/fwd)
+1x      0.914           1977.183        2162.5x
+10x     3.022           1837.332        608.1x
+
+Interpret: forward cost tracks total segment length (pixels drawn);
+backward cost tracks pixels x segments and is ~flat in zoom.
+
+=== Lab 3: Three.js capture ===
+$ node capture_three.mjs
+browser: 153.0.8010.12
+wrote plan_three.ppm, plan_three.png, out/legend_*.png
+
+=== Lab 3: compare raster vs Three.js ===
+$ node compare.mjs out/plan_scratch.ppm plan_three.ppm --diff out/plan_diff.ppm --scale 6
+same size 800x600   identical pixels: 452870/480000   PSNR: 22.2 dB   SSIM: 0.981   max |diff|: 235
+wrote out/plan_diff.ppm (|A-B| x6)
+
+=== Lab 3: compare raster vs plan_three.png (module form) ===
+$ node compare.mjs out/plan_scratch.ppm plan_three.png
+same size 800x600   identical pixels: 452870/480000   PSNR: 22.2 dB   SSIM: 0.981   max |diff|: 235
+
+=== PNG previews ===
+$ node ppm2png.mjs out/plan_scratch.ppm out/plan_scratch.png
+wrote out/plan_scratch.png
+
+=== PNG previews ===
+$ node ppm2png.mjs out/plan_diff.ppm out/plan_diff.png
+wrote out/plan_diff.png

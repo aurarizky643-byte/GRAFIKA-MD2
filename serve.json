@@ -1,0 +1,4 @@
+{
+  "cleanUrls": false,
+  "rewrites": [{ "source": "/web", "destination": "/web/index.html" }, { "source": "/web/", "destination": "/web/index.html" }]
+}
