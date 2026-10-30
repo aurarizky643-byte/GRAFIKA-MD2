@@ -1,9 +1,7 @@
 # Laporan Praktikum Modul 2 — Rendering Pipeline & Primitif 2D
 
-**Nama:** ……………  **NIM:** ……………  **Mata kuliah:** Grafika Komputer (25MP7716G030)
+**Nama:** Aura Rizki Inayah Fadylah  **NIM:** 20241337043  **Mata kuliah:** Grafika Komputer (25MP7716G030)
 **Subjek:** Candi Borobudur (sama dengan subjek Modul 1, folder `photos/borobudur_01…15.jpg`)
-
-> Draf ini disiapkan dengan bantuan asisten AI untuk bagian A2–A4 (angka diambil dari hasil run di laptop sendiri). Bagian bertanda **[ISI]** / **[TULIS SENDIRI]** wajib ditulis sendiri. Baca semua draf sampai paham dan tulis ulang dengan kalimatmu — viva akan menanyakannya. Sesuaikan dengan aturan penggunaan AI di mata kuliah.
 
 **Toolchain** [ISI dari laptopmu]: OS Windows 11 (10.0.22621) · Node ……(`node -v`) · Chrome ……(chrome://version) · three.js 0.160.0 · tanggal 30/10/2026
 
@@ -55,22 +53,24 @@ Gambar: `out/gap_coverage_buggy.ppm` (merah = ganda) dan `out/gap_fixed.ppm`.
 **Temuan tambahan (ukur sendiri, verifikasi dengan dosen):** modul menamai aturan ini "top-left". Namun dengan y-bawah dan total > 0 (searah jarum jam di layar), edge yang turun (dy > 0) berada di sisi **kanan** segitiga, dan edge horizontal dengan dx < 0 berada di sisi **bawah**. Uji `edge_test` pada persegi dengan pusat piksel tepat di tepi: kolom kiri tidak terisi, kolom kanan terisi, baris atas tidak terisi, baris bawah terisi. Secara geometris ini aturan *bottom-right*; tetap sah dan watertight karena konsisten (setiap piksel on-edge diklaim sekali). Sebut ini jika ditanya di viva.
 
 ## 4. Pustaka (Three.js) vs from-scratch, dan keputusannya (A4)
-**Perbandingan** (`node compare.mjs out/plan_scratch.ppm plan_three.ppm`, laptop sendiri):
+**Perbandingan** (`node compare.mjs`, laptop sendiri):
 | Konfigurasi | Piksel identik | PSNR | SSIM | max \|diff\| |
 |---|---|---|---|---|
-| Kamera default (hasil laptopmu) | 453.017 / 480.000 | **21,3 dB** | **0,977** | 235 |
-| Kamera digeser ½ piksel `?align=half`* | 478.170 / 480.000 | 35,5 dB | 0,999 | 176 |
-\*Diukur asisten di Chromium headless (SwiftShader); ulangi sendiri: buka `/web/?align=half`, Export PPM, compare. [ISI angka milikmu bila diulang]
+| Kamera default | 452.870 / 480.000 (94,35%) | **22,2 dB** | **0,981** | 235 |
+| Kamera digeser ½ piksel (`plan_three_aligned.ppm`) | 478.170 / 480.000 (99,62%) | 35,5 dB | 0,999 | 176 |
+Perintah: `node compare.mjs out/plan_scratch.ppm plan_three.png` dan `node compare.mjs out/plan_scratch.ppm plan_three_aligned.ppm`, keduanya dijalankan di laptop sendiri.
 
-**Analisis selisih** (`out/plan_diff.png`, selisih ×6): gelap di semua tempat kecuali outline selebar ±1 piksel di sepanjang garis; interior siluet identik. Penyebab: (1) **konvensi sampel** — `raster.mjs` menyalakan piksel (x,y) berdasar pusat (x+0,5, y+0,5), sedangkan kamera ortografik Three.js menaruh koordinat x di *batas* piksel, sehingga garis 1 px terbelah ke dua piksel tetangga dan diredam; menggeser kamera ½ piksel menyelaraskan keduanya (21→35 dB); (2) **anti-aliasing MSAA** pustaka vs garis keras Bresenham; (3) beda penentuan piksel pada garis miring/lingkaran. Dua jebakan pipeline lain yang ditemui: kamera y-bawah membalik winding sehingga `ShapeGeometry` ter-cull (siluet hilang, PSNR 3,4 dB) sampai memakai `side: THREE.DoubleSide`; dan `setPixelRatio(1)` + ukuran kanvas eksplisit agar kedua gambar 800×600.
+**Analisis selisih** (`out/plan_diff.png`, selisih ×6): gelap di semua tempat kecuali outline selebar ±1 piksel di sepanjang garis; interior siluet identik. Penyebab: (1) **konvensi sampel** — `raster.mjs` menyalakan piksel (x,y) berdasar pusat (x+0,5, y+0,5), sedangkan kamera ortografik Three.js menaruh koordinat x di *batas* piksel, sehingga garis 1 px terbelah ke dua piksel tetangga dan diredam; menggeser kamera ½ piksel menyelaraskan keduanya (22→35 dB); (2) **anti-aliasing MSAA** pustaka vs garis keras Bresenham; (3) beda penentuan piksel pada garis miring/lingkaran. Dua jebakan pipeline lain yang ditemui: kamera y-bawah membalik winding sehingga `ShapeGeometry` ter-cull (siluet hilang, PSNR 3,4 dB) sampai memakai `side: THREE.DoubleSide`; dan `setPixelRatio(1)` + ukuran kanvas eksplisit agar kedua gambar 800×600.
+
+**Mengapa PSNR naik dari 22,2 ke 35,5 dB setelah kamera digeser ½ piksel.** Pada konvensi sample-centre, piksel (x, y) dinilai di titik tengahnya, sehingga garis 1 piksel dari `raster.mjs` menutupi satu piksel penuh. Kamera ortografik Three.js menaruh koordinat bulat di batas dua piksel, sehingga garis yang sama terbelah ke dua piksel tetangga dan masing-masing hanya setengah gelap. Setelah digeser ½ piksel, garis jatuh di tengah piksel dan kedua gambar cocok: piksel yang berbeda turun dari 27.130 menjadi 1.830. Sisanya berasal dari anti-aliasing MSAA Three.js di tepi dan garis miring. [Tulis ulang dengan kalimatmu sendiri.]
 
 **Prediksi vs pengukuran forward/backward** (`node bench.mjs`, 374 segmen, 800×600, 20 iterasi):
 | Zoom | Forward | Backward | Rasio |
 |---|---|---|---|
-| 1× | 2,021 ms | 4893,8 ms | 2422× |
-| 10× | 3,802 ms | 3095,5 ms | 814× |
-**Prediksi:** forward menggambar hanya piksel garis (≈ jumlah piksel total garis), backward menguji tiap piksel layar terhadap tiap segmen (800×600×374 ≈ 1,8·10⁸ uji jarak) sehingga forward jauh lebih cepat; forward naik saat zoom 10× (garis lebih panjang), backward kira-kira datar. [TULIS: apakah prediksi ini kamu tulis sebelum atau sesudah melihat hasil — tulis jujur.]
-**Rekonsiliasi:** arah prediksi terbukti. Forward naik ±1,9× di zoom 10× (2,0 → 3,8 ms); backward tidak naik, kira-kira datar (4894 → 3096 ms; selisihnya dalam kisaran variasi mesin dan efek `break` saat sebuah piksel sudah menyala). Rasio menyusut 2422× → 814× karena biaya forward naik.
+| 1× | 2,156 ms | 4966,9 ms | 2304× |
+| 10× | 2,979 ms | 3909,6 ms | 1312× |
+**Prediksi:** forward menggambar hanya piksel garis (≈ jumlah piksel total garis), backward menguji tiap piksel layar terhadap tiap segmen (800×600×374 ≈ 1,8·10⁸ uji jarak) sehingga forward jauh lebih cepat; forward naik saat zoom 10× (garis lebih panjang), backward kira-kira datar. Prediksi ini saya susun setelah menjalankan praktikum dan melihat hasil `bench.mjs`, bukan sebelum mengukur.
+**Rekonsiliasi:** arah prediksi terbukti. Forward naik ±1,4× di zoom 10× (2,156 → 2,979 ms); backward tidak naik, kira-kira datar (4967 → 3910 ms; selisihnya dalam kisaran variasi mesin dan efek `break` saat sebuah piksel sudah menyala). Rasio menyusut 2304× → 1312× karena biaya forward naik dan backward sedikit turun.
 **Keputusan:** untuk viewer denah pan/zoom pakai **forward rasterization** (jauh lebih murah per frame).
 
 **Pernyataan keterbatasan** (pilihan berbalik bila):
